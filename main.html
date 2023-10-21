@@ -370,7 +370,7 @@ class CPU {
 
         // Function to generate a random wall
         function generateRandomWall(x) {
-            const height = Math.random() * 50 + 20;
+            const height = Math.random() * 70 + 20;
             const grayShade = Math.floor(Math.random() * 156) + 100; // Random gray shade between 100 and 255
             const color = `rgb(${grayShade}, ${grayShade}, ${grayShade})`;
             const wall = new GameElement(x, canvas.height - groundHeight - height, 20, height, color);
@@ -469,7 +469,7 @@ class CPU {
         }
 
         // Initialize the game with initial walls
-        for (let x = 200; x < 10000; x += 200) {
+        for (let x = 200; x < 10000; x += Math.floor(Math.random() * 206) + 100) {
             generateRandomWall(x);
         }
 
