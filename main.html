@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Updated Platformer Game</title>
+    <style>
+        canvas {
+            background-color: #88B4E0; /* Light blue background */
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="400"></canvas>
+    <script>
+     class NeuralNetwork {
+            constructor(layers) {
+                this.layers = layers;
+                this.weights = [];
+                this.biases = [];
+                this.initializeWeightsAndBiases();
+            }
+
+            initializeWeightsAndBiases() {
+                for (let i = 1; i < this.layers.length; i++) {
+                    const prevLayerNodes = this.layers[i - 1];
+                    const currentLayerNodes = this.layers[i];
+
+            const weightMatrix = new Array(currentLayerNodes).fill(null).map(() =>
+                new Array(prevLayerNodes).fill(0).map(() => Math.random() * 2 - 1)
+            );
+
+                    this.weights.push(weightMatrix);
+
+                    const biasVector = new Array(currentLayerNodes).fill(0).map(() => Math.random() * 2 - 1);
+                    this.biases.push(biasVector);
+                }
+            }
+
+            lerplearn (cpu) {
+
+                const lerpFactor = 0.2; // Adjust as needed
+
+                for (let i = 0; i < this.weights.length; i++) {
+                    for (let j = 0; j < this.weights[i].length; j++) {
+                        for (let k = 0; k < this.weights[i][j].length; k++) {
+                            this.weights[i][j][k] = cpu.weights[i][j][k] + lerpFactor * (Math.random() - 0.5);
+                        }
+                    }
+                }
+                for (let i = 0; i < this.biases.length; i++) {
+                    for (let j = 0; j < this.biases[i].length; j++) {
+                            this.biases[i][j] = cpu.biases[i][j] + lerpFactor * (Math.random() - 0.5);
+                    }
+                }
+
+            }
+
+            propagate(inputs) {
+                let prevLayerOutput = inputs;
+
+                for (let i = 0; i < this.layers.length - 1; i++) {
+                    const layerWeights = this.weights[i];
+                    const layerBiases = this.biases[i];
+
+                    const nextLayerNodes = this.layers[i + 1];
+                    const nextLayerOutput = new Array(nextLayerNodes).fill(0);
+
+                    for (let j = 0; j < nextLayerNodes; j++) {
+                        let nodeOutput = 0;
+                        for (let k = 0; k < prevLayerOutput.length; k++) {
+                            nodeOutput += prevLayerOutput[k] * layerWeights[j][k];
+                        }
+                        nodeOutput += layerBiases[j];
+                        nextLayerOutput[j] = nodeOutput;
+                    }
+
+                    // Apply activation function (step function) - output > 0.5 becomes 1, else 0
+                    for (let j = 0; j < nextLayerOutput.length; j++) {
+                        nextLayerOutput[j] = nextLayerOutput[j] > 0.5 ? 1 : 0;
+                    }
+
+                    prevLayerOutput = nextLayerOutput;
+                }
+
+                return prevLayerOutput; // Output of the last layer
+            }
+        }
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 40;
+                this.height = 40;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.friction = 0.8; // Reduced friction value
+                this.gravity = 0.4;
+                this.jumping = false;
+            }
+
+            update() {
+                // Apply friction only if no left or right arrow key is pressed
+                if (!keys['ArrowLeft'] && !keys['ArrowRight']) {
+                    this.velocityX *= this.friction;
+                }
+
+                // Apply gravity
+                this.velocityY += this.gravity;
+
+                // Jump
+                if (this.jumping && this.y + this.height >= canvas.height - groundHeight) {
+                    this.velocityY = -10; // Adjust the jump strength
+                    this.jumping = false;
+                }
+
+                // Move the player based on velocity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Keep the player within the canvas bounds
+                if (this.x < 0) {
+                    this.x = 0;
+                }
+
+                if (this.y + this.height > canvas.height - groundHeight) {
+                    this.y = canvas.height - groundHeight - this.height;
+                    this.velocityY = 0;
+                    this.jumping = false;
+                }
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = 'red';
+                ctx.fillRect(this.x - screenX, this.y, this.width, this.height);
+            }
+        }
+
+        class GameElement {
+            constructor(x, y, width, height, color) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - screenX, this.y, this.width, this.height);
+            }
+        }
+
+class CPU {
+    constructor(x, y, width, height, color) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.color = color;
+        this.velocityX = 0;
+        this.velocityY = 0;
+        this.friction = 0.8; // Reduced friction value
+        this.gravity = 0.4;
+        this.jumping = false;
+        this.randomMoveTimer = 0;
+        this.cleft = false;
+        this.cright = false;
+        this.cjump = false;
+        this.brain = new NeuralNetwork(layers);
+    }
+
+    getRayIntersections() {
+        const rayCount = 12; // Number of rays
+        const rayLength = 100; // Length of each ray
+
+        const intersections = [];
+
+        for (let i = 0; i < rayCount; i++) {
+            const angle = (i / rayCount) * (2 * Math.PI);
+            const rayEndpointX = this.x + rayLength * Math.cos(angle);
+            const rayEndpointY = this.y + rayLength * Math.sin(angle);
+            let nearestIntersection = rayLength;
+            let intersectionPoint = { x: rayEndpointX, y: rayEndpointY };
+
+            for (const wall of walls) {
+                const intersection = this.getIntersectionPoint(this.x, this.y, rayEndpointX, rayEndpointY, wall);
+
+                if (intersection) {
+                    const dx = intersection.x - this.x;
+                    const dy = intersection.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < nearestIntersection) {
+                        nearestIntersection = distance;
+                        intersectionPoint = intersection;
+                    }
+                }
+            }
+
+            intersections.push(nearestIntersection / rayLength);
+        }
+
+        return intersections;
+    }
+
+    getIntersectionPoint(x1, y1, x2, y2, wall) {
+        const x3 = wall.x;
+        const y3 = wall.y;
+        const x4 = wall.x + wall.width;
+        const y4 = wall.y + wall.height;
+
+        const denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+
+        if (denominator === 0) {
+            return null;
+        }
+
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
+
+        if (t > 0 && t < 1 && u > 0) {
+            return {
+                x: x1 + t * (x2 - x1),
+                y: y1 + t * (y2 - y1)
+            };
+        }
+
+        return null;
+    }
+
+    // Rest of the CPU class
+
+
+    update() {
+        // Apply gravity
+        this.velocityY += 0.4;
+
+        // Randomly select left, right, or jump
+        //this.randomMoveTimer -= 1;
+        //if (this.randomMoveTimer <= 0) {
+        /**   const randomAction = Math.floor(Math.random() * 3); // 0 for left, 1 for right, 2 for jump
+            if (randomAction === 0) {
+                this.velocityX = -2; // Move left
+            } else if (randomAction === 1) {
+                this.velocityX = 2; // Move right
+            } else {
+                // Jump if the CPU is on the ground
+                if (this.y + this.height >= canvas.height - groundHeight) {
+                    this.velocityY = -8; // Adjust the jump strength
+                    this.jumping = true;
+                }
+            }
+
+            this.randomMoveTimer = Math.floor(Math.random() * 60) + 30; // Random time between actions
+        } **/
+
+        const inputs = this.getRayIntersections();
+        const outputs = this.brain.propagate(inputs);
+
+        if (outputs[0] == 1) {
+            //JUMP
+            if (this.y + this.height >= canvas.height - groundHeight) {
+                this.velocityY = -10; // Adjust the jump strength
+                this.jumping = true;
+            }
+        }
+
+        if (outputs[1] == 1) {
+            //Left
+            this.velocityX = -2; // Move left
+        }
+        if (outputs[2] == 1) {
+            //Right
+            this.velocityX = 2; // Move right
+        }
+
+        //console.table(inputs);
+        //console.table(outputs);
+
+
+
+
+        // Move the CPU character based on velocity
+        this.x += this.velocityX;
+        this.y += this.velocityY;
+
+        // Bounce off the ground
+        if (this.y + this.height > canvas.height - groundHeight) {
+            this.y = canvas.height - groundHeight - this.height;
+            this.velocityY = 0;
+            this.jumping = false;
+        }
+
+        // Wrap around when reaching canvas boundaries
+        if (this.x < 0) {
+            this.x = 0;
+        } else if (this.x > canvas.width) {
+            //this.x = 0;
+        }
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - screenX, this.y, this.width, this.height);
+        }
+}
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Define ground height
+        const groundHeight = 20;
+
+        // Create a simple ground object
+        const ground = new GameElement(0, canvas.height - groundHeight, 10000, groundHeight, '#5C4033'); // Brown color
+
+        // Create an array to store walls
+        const walls = [];
+        let bestcpu;
+
+        // Create an array to store CPU characters
+        const layers = [12, 8, 3]; // Define the neural network layers [input, hidden1, hidden2, output]
+        const cpus = [];
+        for (let i = 0; i < 1000; i++) {
+            const x = 100;
+            const y = canvas.height - groundHeight - 40;
+            const width = 40;
+            const height = 40;
+            const color = 'rgba(0, 0, 255, 0.2)';
+            const cpu = new CPU(x, y, width, height, color);
+            cpus.push(cpu);
+            bestcpu = cpu;
+        }
+
+        // Create the player
+        const player = new Player(50, canvas.height - groundHeight - 40);
+
+        // Initialize player position
+        let playerStartX = player.x;
+
+        // Create a variable to track the screen position
+        let screenX = 0;
+
+        // Keyboard input handling
+        const keys = {};
+
+        document.addEventListener('keydown', (event) => {
+            keys[event.key] = true;
+
+            // Move the player left when the left arrow key is pressed
+            if (event.key === 'ArrowLeft') {
+                player.velocityX = -4;
+            }
+
+            // Move the player right when the right arrow key is pressed
+            if (event.key === 'ArrowRight') {
+                player.velocityX = 4;
+            }
+
+            // Jump when the 'Up' arrow key is pressed
+            if (event.key === 'ArrowUp' && player.y + player.height >= canvas.height - groundHeight) {
+                player.jumping = true;
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            keys[event.key] = false;
+        });
+
+        // Function to generate a random wall
+        function generateRandomWall(x) {
+            const height = Math.random() * 50 + 20;
+            const grayShade = Math.floor(Math.random() * 156) + 100; // Random gray shade between 100 and 255
+            const color = `rgb(${grayShade}, ${grayShade}, ${grayShade})`;
+            const wall = new GameElement(x, canvas.height - groundHeight - height, 20, height, color);
+            walls.push(wall);
+        }
+
+        // Function to update the game elements
+        function updateGameElements() {
+            player.update();
+
+            // Check for collisions with walls
+            walls.forEach((wall) => {
+                if (isColliding(player, wall)) {
+                    // Reset player position
+                    player.x = playerStartX;
+                    player.y = canvas.height - groundHeight - player.height;
+                    player.velocityX = 0;
+                    player.velocityY = 0;
+                    screenX = 0;
+                }
+                cpus.forEach((cpu) => {
+                    if (isColliding(cpu, wall)) {
+
+                        if (cpu != bestcpu) {
+                            cpu.brain.lerplearn(bestcpu.brain);
+                        } else {
+                            console.log('best brain died');
+                        }
+                        // Reset player position
+                        cpu.x = playerStartX;
+                        cpu.y = canvas.height - groundHeight - player.height;
+                        cpu.velocityX = 0;
+                        cpu.velocityY = 0;
+
+                    }
+                });
+                wall.draw(ctx);
+            });
+
+            // Remove walls that are off-screen and generate new ones
+            maxScreenX = screenX + canvas.width;
+            //while (walls.length > 0 && walls[0].x + 20 < screenX) {
+                //walls.shift();
+            //}
+
+            while (walls.length === 0 || walls[walls.length - 1].x + 20 < maxScreenX) {
+                const newWallX = (walls.length === 0) ? maxScreenX : walls[walls.length - 1].x + 200;
+                generateRandomWall(newWallX);
+            }
+
+            // Update and render the CPU characters
+            cpus.forEach((cpu) => {
+                cpu.update();
+                cpu.draw(ctx);
+            });
+
+
+            bestcpu.color = 'rgba(0, 0, 255, 0.2)'; //make old best cpu bland
+
+            bestcpu = cpus.reduce((max, cpu) => max.x > cpu.x ? max : cpu);
+        
+            bestcpu.color = 'rgba(0, 255, 255, 1)'; //hihglight new bestcpu
+
+
+            if (player.x > screenX + canvas.width * 0.7) {
+                screenX = player.x - canvas.width * 0.7;
+            } 
+        }
+
+        // Function to check for collisions between two objects
+        function isColliding(obj1, obj2) {
+            return obj1.x < obj2.x + obj2.width &&
+                obj1.x + obj1.width > obj2.x &&
+                obj1.y < obj2.y + obj2.height &&
+                obj1.y + obj1.height > obj2.y;
+        }
+
+        // Game loop
+        function gameLoop() {
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update and render the ground
+            ground.draw(ctx);
+
+            // Update and render the Player
+            updateGameElements();
+            player.draw(ctx);
+
+            // Update and render the CPU characters
+            cpus.forEach((cpu) => {
+                cpu.draw(ctx);
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize the game with initial walls
+        for (let x = 200; x < 10000; x += 200) {
+            generateRandomWall(x);
+        }
+
+        // Game loop initialization
+        gameLoop();
+    </script>
+</body>
+</html>
