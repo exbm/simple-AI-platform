@@ -12,8 +12,153 @@
 </head>
 <body>
     <canvas id="canvas" width="800" height="400"></canvas>
+    <canvas id="graphCanvas" width="400" height="400"></canvas>
     <script>
-     class NeuralNetwork {
+    class Sprite {
+        constructor(imageSrc, width, height, numFrames, x, y, offsetX, offsetY, canvas) {
+            this.canvas = canvas;
+            this.ctx = this.canvas.getContext("2d");
+            this.spriteImage = new Image();
+            this.spriteImage.src = imageSrc;
+            this.spriteWidth = width;
+            this.spriteHeight = height;
+            this.numFrames = numFrames;
+            this.currentFrame = 0;
+            this.animationId = null;
+            this.mode = "stopped";
+            this.x = x; // Initial x coordinate
+            this.y = y; // Initial y coordinate
+            this.offsetX = offsetX; // X offset for the sprite within the image
+            this.offsetY = offsetY; // Y offset for the sprite within the image
+            this.flipSprite = false;
+            this.interval = false;
+            this.animationsSpeed = 15;
+            this.spriteImage.onload = () => {
+                //this.drawFrame(this.currentFrame, 0);
+            };
+        }
+
+        drawFrame(frameX, frameY) {
+            this.ctx.clearRect(0, 0, this.spriteWidth, this.spriteHeight);
+            
+            if (this.flipSprite == true) {
+                ctx.save();
+                ctx.scale(-1, 1);
+            }
+            this.ctx.drawImage(
+                this.spriteImage,
+                (frameX * this.spriteWidth) + this.offsetX,
+                frameY * this.spriteHeight + this.offsetY,
+                this.spriteWidth,
+                this.spriteHeight,
+                this.x * (this.flipSprite ? -1: 1), // X coordinate
+                this.y, // Y coordinate
+                40 * (this.flipSprite ? -1: 1),
+                55);
+
+            this.ctx.restore();
+        }
+
+
+
+        draw() {
+
+            if (this.mode === "running") {
+                if (this.interval == false) {
+                this.interval = setInterval(() => {
+                    this.currentFrame = (this.currentFrame + 1) % this.numFrames;
+                }, 1000 / this.animationsSpeed);
+                }
+                this.drawFrame(this.currentFrame, 0);
+
+            } else {
+                clearInterval(this.interval);
+                this.interval = false;
+                this.currentFrame = 0;
+                this.drawFrame(0, 0);
+            }
+
+        }
+
+        start() {
+            if (this.mode !== "running") {
+                this.mode = "running";
+                this.update();
+            }
+        }
+
+        stop() {
+            if (this.mode !== "stopped") {
+                this.mode = "stopped";
+                cancelAnimationFrame(this.animationId);
+                this.drawFrame(0, 0);
+            }
+        }
+    }
+
+    class NeuralNetworkVisualization {
+        constructor(layers, NN, canvas) {
+            this.NN = NN;
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+            this.nodeRadius = 20;
+            this.nodeSpacing = 30;
+        }
+
+        drawNode(x, y, value) {
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, this.nodeRadius, 0, Math.PI * 2);
+            this.ctx.fillStyle = 'white';
+            this.ctx.fill();
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeStyle = 'black';
+            this.ctx.stroke();
+            this.ctx.fillStyle = 'black';
+            this.ctx.font = 'bold 14px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            //this.ctx.fillText(value.toFixed(2), x, y);
+        }
+
+        drawConnection(x1, y1, x2, y2, weight) {
+            const lineWidth = Math.abs(weight) * 5; // Adjust the scale for line weight
+            this.ctx.lineWidth = lineWidth;
+            this.ctx.strokeStyle = weight > 0 ? 'green' : 'red';
+            this.ctx.beginPath();
+            this.ctx.moveTo(x1, y1);
+            this.ctx.lineTo(x2, y2);
+            this.ctx.stroke();
+        }
+
+        drawNeuralNetwork() {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+            for (let i = 0; i < this.NN.layers.length; i++) {
+                const nodesInLayer = this.NN.layers[i];
+                const x = this.nodeSpacing * (i + 1);
+
+                for (let j = 0; j < nodesInLayer; j++) {
+                    const y = (this.canvas.height / 2) - ((nodesInLayer - 1) * this.nodeSpacing) / 2 + j * this.nodeSpacing;
+
+                    const value = (i === 0) ? '0' : '1'; 
+
+                    this.drawNode(x, y, value);
+
+                    if (i > 1) {
+                        const prevNodes = this.NN.layers[i - 1];
+                        const prevX = this.nodeSpacing * i - this.nodeSpacing / 2;
+                        for (let k = 0; k < prevNodes; k++) {
+                            const prevY = (this.canvas.height / 2) - ((prevNodes - 1) * this.nodeSpacing) / 2 + k * this.nodeSpacing;
+                            const weight = this.NN.weights[i - 2][k][j];
+                            this.drawConnection(prevX, prevY, x, y, weight);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+class NeuralNetwork {
             constructor(layers) {
                 this.layers = layers;
                 this.weights = [];
@@ -91,12 +236,15 @@
                 this.x = x;
                 this.y = y;
                 this.width = 40;
-                this.height = 40;
+                this.height = 53;
                 this.velocityX = 0;
                 this.velocityY = 0;
                 this.friction = 0.8; // Reduced friction value
                 this.gravity = 0.4;
                 this.jumping = false;
+
+                this.sprite = new Sprite("data:image/png;base64,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", 100, 175, 4, this.x, this.y, 0, 175, canvas);
+
             }
 
             update() {
@@ -111,7 +259,7 @@
                 // Jump
                 if (this.jumping && this.y + this.height >= canvas.height - groundHeight) {
                     this.velocityY = -10; // Adjust the jump strength
-                    this.jumping = false;
+                    //this.jumping = false;
                 }
 
                 // Move the player based on velocity
@@ -131,8 +279,41 @@
             }
 
             draw(ctx) {
-                ctx.fillStyle = 'red';
-                ctx.fillRect(this.x - screenX, this.y, this.width, this.height);
+
+                this.sprite.x = this.x - screenX;
+                this.sprite.y = this.y;
+
+                if (this.jumping) {
+                    
+                    this.sprite.offsetY = 0;
+                    this.sprite.offsetX = 300;
+
+                    //this.sprite.numFrames = 5;
+                    this.sprite.mode = "stopped";
+                    //this.sprite.loop = false;
+                } else {
+
+                    this.sprite.offsetY = 175;
+                    this.sprite.offsetX = 0;
+
+                    if (this.velocityX  > 3.5) {
+                        this.sprite.flipSprite = false;
+                        this.sprite.mode = 'running';
+                    } else if(this.velocityX < -3.5) {
+                        this.sprite.flipSprite = true;
+                        this.sprite.mode = 'running';
+                    } else {
+                        this.sprite.mode = 'stopped';
+                    }
+
+                    
+                }
+
+                this.sprite.draw();
+
+
+                //ctx.fillStyle = 'red';
+                //ctx.fillRect(this.x - screenX, this.y, this.width, this.height);
             }
         }
 
@@ -258,6 +439,9 @@ class CPU {
         const inputs = this.getRayIntersections();
         const outputs = this.brain.propagate(inputs);
 
+        this.brain.inputs = inputs;
+        this.brain.outputs = outputs;
+
         if (outputs[0] == 1) {
             //JUMP
             if (this.y + this.height >= canvas.height - groundHeight) {
@@ -320,7 +504,7 @@ class CPU {
         let bestcpu;
 
         // Create an array to store CPU characters
-        const layers = [12, 8, 3]; // Define the neural network layers [input, hidden1, hidden2, output]
+        const layers = [12, 8, 6, 3]; // Define the neural network layers [input, hidden1, hidden2, output]
         const cpus = [];
         for (let i = 0; i < 1000; i++) {
             const x = 100;
@@ -332,6 +516,12 @@ class CPU {
             cpus.push(cpu);
             bestcpu = cpu;
         }
+
+        // Create an instance of NNOutputGraph
+        const NNVis = new NeuralNetworkVisualization( layers, bestcpu.brain, document.getElementById('graphCanvas'));
+
+        // Start graphing the neural network output
+ 
 
         // Create the player
         const player = new Player(50, canvas.height - groundHeight - 40);
@@ -436,6 +626,8 @@ class CPU {
             bestcpu.color = 'rgba(0, 0, 255, 0.2)'; //make old best cpu bland
 
             bestcpu = cpus.reduce((max, cpu) => max.x > cpu.x ? max : cpu);
+
+            //nnGraph.neuralNetwork = bestcpu.brain;
         
             bestcpu.color = 'rgba(0, 255, 255, 1)'; //hihglight new bestcpu
 
@@ -470,7 +662,13 @@ class CPU {
                 cpu.draw(ctx);
             });
 
-            requestAnimationFrame(gameLoop);
+            NNVis.NeuralNetwork = bestcpu.brain;
+
+            NNVis.drawNeuralNetwork();
+
+            setTimeout(() => {
+                requestAnimationFrame(gameLoop);
+            }, 1000 / 90);
         }
 
         // Initialize the game with initial walls
