@@ -940,17 +940,17 @@ class CPU {
 
             NNVis.drawNeuralNetwork();
 
-            if (cpus.length < 500) {
+            if (cpus.length < 50) {
                 window.setTimeout(() => {
 
-                    const x = Math.floor(Math.random() * 1000) +1000 ;
+                    const x = Math.floor(Math.random() * 10000) +1000 ;
                     const y = canvas.height - groundHeight - 40;
                     const width = 40;
                     const height = 55;
                     const color = 'rgba(0, 0, 255, 0.2)';
                     const cpu = new CPU(x, y, width, height, color);
                     cpus.push(cpu);
-                }, Math.floor(Math.random() * 9) * 1000 );
+                }, Math.floor(Math.random() * 9) * 100000 );
             }
 
             setTimeout(() => {
